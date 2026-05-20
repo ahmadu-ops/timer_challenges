@@ -12,22 +12,161 @@ class RecordsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final RecordsState records = ref.watch(recordsProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Records'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.read(recordsProvider.notifier).loadRecords();
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Records'),
+          bottom: const TabBar(
+            tabs: <Tab>[
+              Tab(text: 'Global', icon: Icon(Icons.public)),
+              Tab(text: 'Par défi', icon: Icon(Icons.emoji_events)),
+            ],
+          ),
+        ),
+        body: TabBarView(
           children: <Widget>[
-            _StatsCards(records: records),
-            const SizedBox(height: 24),
-            _HistorySection(history: records.history),
+            _GlobalRecords(records: records),
+            _ChallengeRecords(records: records),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _GlobalRecords extends StatelessWidget {
+  const _GlobalRecords({required this.records});
+
+  final RecordsState records;
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        // Refresh handled by provider
+      },
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          _StatsCards(records: records),
+          const SizedBox(height: 24),
+          _HistorySection(history: records.history),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChallengeRecords extends ConsumerWidget {
+  const _ChallengeRecords({required this.records});
+
+  final RecordsState records;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final List<Challenge> challenges = ref.watch(challengesProvider);
+
+    if (challenges.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(Icons.emoji_events_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text('Aucun défi créé'),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: challenges.length,
+      itemBuilder: (BuildContext context, int index) {
+        final Challenge challenge = challenges[index];
+        final int? bestTime = records.bestTimePerChallenge[challenge.id];
+        final int sessionCount = records.sessionsPerChallenge[challenge.id] ?? 0;
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Icon(
+                      challenge.isCompleted ? Icons.check_circle : Icons.emoji_events,
+                      color: challenge.isCompleted ? Colors.green : Colors.orange,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        challenge.title,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _ChallengeStatRow(
+                  icon: Icons.timer,
+                  label: 'Meilleur temps',
+                  value: bestTime != null ? TimerService.formatTime(bestTime) : '--:--:--',
+                ),
+                _ChallengeStatRow(
+                  icon: Icons.play_circle,
+                  label: 'Sessions',
+                  value: sessionCount.toString(),
+                ),
+                _ChallengeStatRow(
+                  icon: Icons.tablet,
+                  label: 'Objectif',
+                  value: '${challenge.targetMinutes} min',
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ChallengeStatRow extends StatelessWidget {
+  const _ChallengeStatRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 20, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -83,7 +222,7 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: <Widget>[
             Icon(icon, size: 32, color: color),
@@ -91,13 +230,16 @@ class _StatCard extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+            FittedBox(
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
             ),
           ],
         ),
@@ -137,7 +279,7 @@ class _EmptyHistory extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Padding(
-        padding: EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(32),
         child: Text('Aucune session enregistrée'),
       ),
     );

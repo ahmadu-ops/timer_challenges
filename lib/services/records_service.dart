@@ -38,9 +38,25 @@ final class RecordsService {
     }
   }
 
+  List<Session> getAllSessions() {
+    try {
+      final Box<Map<dynamic, dynamic>> box = _getBox();
+      final List<Session> sessions = <Session>[];
+      
+      for (final Map<dynamic, dynamic> map in box.values) {
+        sessions.add(Session.fromMap(map));
+      }
+      
+      sessions.sort((Session a, Session b) => b.date.compareTo(a.date));
+      return sessions;
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération: $e');
+    }
+  }
+
   int? getBestTime() {
     try {
-      final List<Session> sessions = getHistory();
+      final List<Session> sessions = getAllSessions();
       final List<Session> stopwatchSessions = sessions
           .where((Session s) => s.type == TimerMode.stopwatch)
           .toList();
@@ -56,6 +72,44 @@ final class RecordsService {
         }
       }
       return best;
+    } catch (e) {
+      throw Exception('Erreur lors du calcul: $e');
+    }
+  }
+
+  Map<String, int> getBestTimePerChallenge() {
+    try {
+      final List<Session> sessions = getAllSessions();
+      final Map<String, int> bestTimes = <String, int>{};
+
+      for (final Session session in sessions) {
+        if (session.challengeId != null && session.type == TimerMode.stopwatch) {
+          final String challengeId = session.challengeId!;
+          if (!bestTimes.containsKey(challengeId) || session.durationMs > bestTimes[challengeId]!) {
+            bestTimes[challengeId] = session.durationMs;
+          }
+        }
+      }
+
+      return bestTimes;
+    } catch (e) {
+      throw Exception('Erreur lors du calcul: $e');
+    }
+  }
+
+  Map<String, int> getSessionsPerChallenge() {
+    try {
+      final List<Session> sessions = getAllSessions();
+      final Map<String, int> counts = <String, int>{};
+
+      for (final Session session in sessions) {
+        if (session.challengeId != null) {
+          final String challengeId = session.challengeId!;
+          counts[challengeId] = (counts[challengeId] ?? 0) + 1;
+        }
+      }
+
+      return counts;
     } catch (e) {
       throw Exception('Erreur lors du calcul: $e');
     }

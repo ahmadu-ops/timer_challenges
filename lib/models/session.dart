@@ -37,13 +37,14 @@ final class Session {
     TimerMode? type,
     DateTime? date,
     String? challengeId,
+    bool clearChallengeId = false,  // ← AJOUT
   }) {
     return Session(
       id: id ?? this.id,
       durationMs: durationMs ?? this.durationMs,
       type: type ?? this.type,
       date: date ?? this.date,
-      challengeId: challengeId ?? this.challengeId,
+      challengeId: clearChallengeId ? null : (challengeId ?? this.challengeId),  // ← CORRECTION
     );
   }
 

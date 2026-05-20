@@ -29,13 +29,14 @@ final class TimerNotifierState {
     int? elapsedMs,
     int? targetMs,
     String? linkedChallengeId,
+    bool clearLinkedChallenge = false,  // ← AJOUT
   }) {
     return TimerNotifierState(
       state: state ?? this.state,
       mode: mode ?? this.mode,
       elapsedMs: elapsedMs ?? this.elapsedMs,
       targetMs: targetMs ?? this.targetMs,
-      linkedChallengeId: linkedChallengeId ?? this.linkedChallengeId,
+      linkedChallengeId: clearLinkedChallenge ? null : (linkedChallengeId ?? this.linkedChallengeId),  // ← CORRECTION
     );
   }
 }
@@ -47,7 +48,7 @@ class TimerNotifier extends StateNotifier<TimerNotifierState> {
           state: TimerState.idle,
           mode: TimerMode.stopwatch,
           elapsedMs: 0,
-          targetMs: 0,
+          targetMs: 60000,
         )) {
     _startTicker();
   }
@@ -77,8 +78,17 @@ class TimerNotifier extends StateNotifier<TimerNotifierState> {
     state = state.copyWith(targetMs: minutes * 60 * 1000);
   }
 
+  void setTargetMs(int ms) {
+    if (state.state != TimerState.idle) return;
+    state = state.copyWith(targetMs: ms.clamp(0, 86400000));
+  }
+
   void linkChallenge(String? challengeId) {
-    state = state.copyWith(linkedChallengeId: challengeId);
+    if (challengeId == null) {
+      state = state.copyWith(clearLinkedChallenge: true);  // ← CORRECTION
+    } else {
+      state = state.copyWith(linkedChallengeId: challengeId);
+    }
   }
 
   void start() {
@@ -126,7 +136,7 @@ class TimerNotifier extends StateNotifier<TimerNotifierState> {
 
 final StateNotifierProvider<TimerNotifier, TimerNotifierState> timerProvider =
     StateNotifierProvider<TimerNotifier, TimerNotifierState>(
-  (StateNotifierProviderRef<TimerNotifier, TimerNotifierState> ref) => TimerNotifier(),
+  (Ref ref) => TimerNotifier(),
 );
 
 // ============ CHALLENGES STATE ============
@@ -172,8 +182,7 @@ class ChallengesNotifier extends StateNotifier<List<Challenge>> {
 
 final StateNotifierProvider<ChallengesNotifier, List<Challenge>> challengesProvider =
     StateNotifierProvider<ChallengesNotifier, List<Challenge>>(
-  (StateNotifierProviderRef<ChallengesNotifier, List<Challenge>> ref) =>
-      ChallengesNotifier(),
+  (Ref ref) => ChallengesNotifier(),
 );
 
 // ============ RECORDS STATE ============
@@ -182,11 +191,15 @@ final class RecordsState {
   final List<Session> history;
   final int? bestTimeMs;
   final int currentStreak;
+  final Map<String, int> bestTimePerChallenge;  // ← AJOUT
+  final Map<String, int> sessionsPerChallenge;  // ← AJOUT
 
   const RecordsState({
     required this.history,
     this.bestTimeMs,
     required this.currentStreak,
+    this.bestTimePerChallenge = const <String, int>{},  // ← AJOUT
+    this.sessionsPerChallenge = const <String, int>{},  // ← AJOUT
   });
 }
 
@@ -207,11 +220,15 @@ class RecordsNotifier extends StateNotifier<RecordsState> {
       final List<Session> history = _service.getHistory();
       final int? bestTime = _service.getBestTime();
       final int streak = await _service.getCurrentStreak();
+      final Map<String, int> bestPerChallenge = _service.getBestTimePerChallenge();  // ← AJOUT
+      final Map<String, int> sessionsCount = _service.getSessionsPerChallenge();  // ← AJOUT
 
       state = RecordsState(
         history: history,
         bestTimeMs: bestTime,
         currentStreak: streak,
+        bestTimePerChallenge: bestPerChallenge,  // ← AJOUT
+        sessionsPerChallenge: sessionsCount,  // ← AJOUT
       );
     } catch (e) {
       state = const RecordsState(
@@ -224,11 +241,11 @@ class RecordsNotifier extends StateNotifier<RecordsState> {
 
 final StateNotifierProvider<RecordsNotifier, RecordsState> recordsProvider =
     StateNotifierProvider<RecordsNotifier, RecordsState>(
-  (StateNotifierProviderRef<RecordsNotifier, RecordsState> ref) => RecordsNotifier(),
+  (Ref ref) => RecordsNotifier(),
 );
 
 // ============ SERVICES PROVIDERS ============
 
 final Provider<RecordsService> recordsServiceProvider = Provider<RecordsService>(
-  (ProviderRef<RecordsService> ref) => RecordsService(),
+  (Ref ref) => RecordsService(),
 );
